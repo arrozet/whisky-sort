@@ -15,8 +15,9 @@ Follow these strict guidelines for all the code you generate:
     *   Adhere to the proposed class structure.
     *   Use type hinting for all function signatures and variables.
     *   Ensure the code is modular and clean.
-    *   All classes, methods, and functions must be documented with docstrings.
+    *   All classes, methods, and functions must be documented with docstrings that include: clear description of each input parameter, type and meaning of return values (if applicable), and any relevant side effects or expected exceptions.
     *   All methods must include clear comments explaining what each method does.
+    *   Documentation details do not need to be complete during initial development, but must be fully included when a method is considered finished.
 
 3.  **Data Structures:**
     *   Represent the game state using immutable structures (like tuples of tuples) to allow for efficient hashing and storage in visited sets.
