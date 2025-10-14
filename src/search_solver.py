@@ -25,6 +25,31 @@ class SearchResult:
     execution_time: float
 
 
+@dataclass(frozen=True)
+class SearchNode:
+    """Representa un nodo de búsqueda con referencias a su trayectoria."""
+
+    state: GameState
+    parent: Optional["SearchNode"] = None
+    move: Optional[Move] = None
+    depth: int = 0
+    cost: int = 0
+    estimated_total: int = 0
+
+    def reconstruct_path(self) -> Sequence[Move]:
+        """Reconstruye la secuencia de movimientos desde la raíz hasta este nodo."""
+        path: List[Move] = []
+        current: Optional["SearchNode"] = self
+
+        # Se recorre hacia atrás la cadena de padres acumulando los movimientos hasta la raíz.
+        while current is not None and current.move is not None:
+            path.append(current.move)
+            current = current.parent
+
+        path.reverse()
+        return tuple(path)
+
+
 class Frontier(Protocol):
     """Protocolo para colas de frontera utilizadas en la búsqueda."""
 
