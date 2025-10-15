@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import abc
 from dataclasses import dataclass
-from typing import Callable, Deque, Dict, Iterable, List, Optional, Protocol, Sequence, Tuple
+import time
+from typing import Callable, Deque, Dict, Iterable, List, Optional, Protocol, Sequence, Set, Tuple
 
 from collections import deque
 
@@ -71,12 +71,102 @@ class SearchSolver:
         self.game: WaterSortGame = game
 
     def solve(self, initial_state: GameState, method: str, heuristic: Optional[CostHeuristic] = None) -> SearchResult:
-        """Resuelve el puzzle usando el método de búsqueda indicado."""
-        raise NotImplementedError("Implementar selección de algoritmo de búsqueda")
+        """Resuelve el puzzle usando el método de búsqueda indicado.
+
+        Args:
+            initial_state: Estado inicial desde el cual se iniciará la búsqueda.
+            method: Identificador del algoritmo a ejecutar (por ejemplo, "bfs").
+            heuristic: Función heurística opcional requerida por métodos informados.
+
+        Returns:
+            Resultado de la búsqueda con la ruta y las métricas recopiladas.
+
+        Raises:
+            ValueError: Si el método indicado no está implementado o es desconocido.
+        """
+        # Se normaliza el nombre del método para aceptar variantes en mayúsculas/minúsculas.
+        normalized_method: str = method.strip().lower()
+
+        if normalized_method == "bfs":
+            return self.bfs(initial_state)
+
+        raise ValueError(f"Método de búsqueda desconocido: {method}")
 
     def bfs(self, initial_state: GameState) -> SearchResult:
-        """Ejecuta la búsqueda en amplitud para encontrar una solución óptima en movimientos."""
-        raise NotImplementedError("Implementar BFS con control de estados visitados")
+        """Ejecuta la búsqueda en amplitud para encontrar una solución óptima en movimientos.
+
+        Args:
+            initial_state: Estado desde el cual se explora el espacio de búsqueda.
+
+        Returns:
+            Resultado que incluye la ruta solución (si existe) junto con métricas.
+        """
+        # Se mide el tiempo de ejecución desde el comienzo del algoritmo
+        start_time: float = time.perf_counter()
+
+        # Si el estado inicial ya es objetivo, se devuelve inmediatamente
+        if self.game.is_goal_state(initial_state):
+            execution_time: float = time.perf_counter() - start_time
+            return SearchResult(
+                path=tuple(),
+                expanded_nodes=0,
+                max_frontier_size=1,
+                solution_depth=0,
+                execution_time=execution_time,
+            )
+
+        # Se inicializa la frontera FIFO y los conjuntos auxiliares
+        frontier: Deque[SearchNode] = deque([SearchNode(state=initial_state)])
+        visited: Set[GameState] = {initial_state}
+
+        expanded_nodes: int = 0
+        max_frontier_size: int = len(frontier)
+
+        # Mientras haya nodos que explorar en la frontera
+        while frontier:
+            current_node: SearchNode = frontier.popleft()
+            expanded_nodes += 1
+
+            # Se generan y evalúan todos los movimientos válidos desde el estado actual
+            for move in self.game.get_valid_moves(current_node.state):
+                next_state: GameState = self.game.apply_move(current_node.state, move)
+
+                # Se omiten estados ya visitados para evitar ciclos
+                if next_state in visited:
+                    continue
+
+                next_node: SearchNode = SearchNode(
+                    state=next_state,
+                    parent=current_node,
+                    move=move,
+                    depth=current_node.depth + 1,
+                )
+
+                # Se verifica inmediatamente si se alcanzó el objetivo
+                if self.game.is_goal_state(next_state):
+                    path: Sequence[Move] = next_node.reconstruct_path()
+                    execution_time: float = time.perf_counter() - start_time
+                    return SearchResult(
+                        path=path,
+                        expanded_nodes=expanded_nodes,
+                        max_frontier_size=max_frontier_size,
+                        solution_depth=next_node.depth,
+                        execution_time=execution_time,
+                    )
+
+                frontier.append(next_node)
+                visited.add(next_state)
+                max_frontier_size = max(max_frontier_size, len(frontier))
+
+        # Si la búsqueda finaliza sin encontrar solución, se devuelven métricas acumuladas
+        execution_time = time.perf_counter() - start_time
+        return SearchResult(
+            path=tuple(),
+            expanded_nodes=expanded_nodes,
+            max_frontier_size=max_frontier_size,
+            solution_depth=-1,
+            execution_time=execution_time,
+        )
 
     def dfs(self, initial_state: GameState) -> SearchResult:
         """Ejecuta la búsqueda en profundidad manejando límites y detección de ciclos."""

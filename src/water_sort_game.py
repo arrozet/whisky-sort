@@ -200,7 +200,7 @@ class WaterSortGame:
             tube: TubeState = state[tube_index]
 
             # El tubo debe tener una capacidad menor o igual a la capacidad del tubo
-            if len(tube) <= self.tube_capacity and len(tube) > 0:
+            if len(tube) > self.tube_capacity:
                 return False
 
             color_index: int = 0
