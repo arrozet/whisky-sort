@@ -30,8 +30,21 @@ class WaterSortGame:
         # Aquí se inicializarán los generadores y estructuras auxiliares.
 
     def get_initial_state(self) -> GameState:
-        """Genera un estado inicial aleatorio pero resoluble."""
-        raise NotImplementedError("Implementar generación de estado inicial")
+        """
+        Genera un estado inicial aleatorio pero resoluble.
+        
+        Utiliza el PuzzleGenerator para crear un estado inicial válido
+        que garantiza ser resoluble mediante algoritmos de búsqueda.
+        
+        Returns:
+            Estado inicial mezclado y resoluble para comenzar el juego
+        """
+        # Importación local para evitar dependencias circulares
+        from .generator import PuzzleGenerator
+        
+        # Crear generador y producir estado inicial
+        generator = PuzzleGenerator(self)
+        return generator.generate(seed=self.seed)
 
     def get_valid_moves(self, state: GameState) -> Sequence[Move]:
         """Calcula todos los movimientos válidos disponibles para un estado dado."""
@@ -205,6 +218,7 @@ class WaterSortGame:
 
             color_index: int = 0
 
+            """ Se comenta porque el tubo es una tupla de strings, por lo que no se necesita iterar sobre los colores
             while color_index < len(tube):
                 color: str = tube[color_index]
 
@@ -213,7 +227,7 @@ class WaterSortGame:
                     return False
 
                 color_index += 1
-
+            """
             tube_index += 1
 
         return True

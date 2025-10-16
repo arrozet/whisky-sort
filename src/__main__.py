@@ -6,7 +6,7 @@ import argparse
 from typing import Callable, Dict
 
 from .generator import PuzzleGenerator
-from .heuristics import heuristic_blocks, heuristic_color_entropy, heuristic_completed_tubes
+from .heuristics import heuristic3_blocks, heuristic1_color_entropy, heuristic2_completed_tubes
 from .search_solver import SearchResult, SearchSolver
 from .water_sort_game import WaterSortGame
 
@@ -27,8 +27,13 @@ def run_solver(solver: SearchSolver, args: argparse.Namespace) -> SearchResult:
 
 
 def main() -> None:
-    """Función principal que orquesta la ejecución del programa."""
-    raise NotImplementedError("Implementar flujo principal del programa")
+    game = WaterSortGame(num_tubes=6, num_colors=4, seed=42)
+    generator = PuzzleGenerator(game)
+    initial_state = generator.generate()
+
+    # Verificar que es válido y NO es objetivo
+    print(game.is_valid_state(initial_state))  # True
+    print(game.is_goal_state(initial_state))   # False
 
 
 if __name__ == "__main__":
