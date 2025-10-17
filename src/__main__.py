@@ -27,13 +27,8 @@ def run_solver(solver: SearchSolver, args: argparse.Namespace) -> SearchResult:
 
 
 def main() -> None:
-    game = WaterSortGame(num_tubes=6, num_colors=4, seed=42)
-    generator = PuzzleGenerator(game)
-    initial_state = generator.generate()
-
-    # Verificar que es válido y NO es objetivo
-    print(game.is_valid_state(initial_state))  # True
-    print(game.is_goal_state(initial_state))   # False
+    """Función principal que orquesta la ejecución del programa."""
+    raise NotImplementedError("Implementar flujo principal del programa")
 
 
 if __name__ == "__main__":
