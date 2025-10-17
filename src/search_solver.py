@@ -69,6 +69,7 @@ class SearchSolver:
     def __init__(self, game: WaterSortGame) -> None:
         """Inicializa el solver con una instancia del juego."""
         self.game: WaterSortGame = game
+        self.default_depth_limit: int = self.game.num_tubes * self.game.tube_capacity * 2
 
     def solve(self, initial_state: GameState, method: str, heuristic: Optional[CostHeuristic] = None) -> SearchResult:
         """Resuelve el puzzle usando el método de búsqueda indicado.
@@ -89,6 +90,12 @@ class SearchSolver:
 
         if normalized_method == "bfs":
             return self.bfs(initial_state)
+
+        if normalized_method == "dfs":
+            return self.dfs(initial_state)
+
+        if normalized_method in {"dls", "depth_limited", "depth_limited_search"}:
+            return self.depth_limited_search(initial_state, depth_limit=self.default_depth_limit)
 
         raise ValueError(f"Método de búsqueda desconocido: {method}")
 
@@ -131,8 +138,8 @@ class SearchSolver:
             for move in self.game.get_valid_moves(current_node.state):
                 next_state: GameState = self.game.apply_move(current_node.state, move)
 
-                # Se omiten estados ya visitados para evitar ciclos
-                if next_state in visited:
+                # Se omiten estados ya visitados para evitar ciclos compartiendo lógica común
+                if not self._register_if_unvisited(next_state, visited):
                     continue
 
                 next_node: SearchNode = SearchNode(
@@ -155,7 +162,6 @@ class SearchSolver:
                     )
 
                 frontier.append(next_node)
-                visited.add(next_state)
                 max_frontier_size = max(max_frontier_size, len(frontier))
 
         # Si la búsqueda finaliza sin encontrar solución, se devuelven métricas acumuladas
@@ -170,11 +176,107 @@ class SearchSolver:
 
     def dfs(self, initial_state: GameState) -> SearchResult:
         """Ejecuta la búsqueda en profundidad manejando límites y detección de ciclos."""
-        raise NotImplementedError("Implementar DFS iterativa con control de profundidad")
+        return self._iterative_depth_first_search(initial_state, self.default_depth_limit)
 
     def depth_limited_search(self, initial_state: GameState, depth_limit: int) -> SearchResult:
         """Realiza una búsqueda en profundidad limitada hasta una cota específica."""
-        raise NotImplementedError("Implementar búsqueda con límite de profundidad configurable")
+        if depth_limit < 0:
+            raise ValueError("El límite de profundidad debe ser no negativo")
+
+        return self._iterative_depth_first_search(initial_state, depth_limit)
+
+    def _register_if_unvisited(self, state: GameState, visited: Set[GameState]) -> bool:
+        """Registra el estado si no se ha visto previamente.
+
+        Args:
+            state: Estado que se desea evaluar.
+            visited: Conjunto de referencia que acumula los estados visitados.
+
+        Returns:
+            Verdadero si el estado fue agregado; falso si ya se había procesado antes.
+        """
+        if state in visited:
+            return False
+
+        visited.add(state)
+        return True
+
+    def _iterative_depth_first_search(self, initial_state: GameState, depth_limit: int) -> SearchResult:
+        """Ejecuta un recorrido en profundidad iterativo acotado por un límite.
+
+        Args:
+            initial_state: Estado a partir del cual se comienza a explorar.
+            depth_limit: Profundidad máxima permitida para expandir nodos.
+
+        Returns:
+            Resultado de la exploración que incluye métricas y ruta en caso de éxito.
+        """
+        start_time: float = time.perf_counter()
+
+        if self.game.is_goal_state(initial_state):
+            execution_time: float = time.perf_counter() - start_time
+            return SearchResult(
+                path=tuple(),
+                expanded_nodes=0,
+                max_frontier_size=1,
+                solution_depth=0,
+                execution_time=execution_time,
+            )
+
+        # Se inicializa la pila LIFO con la raíz para explorar priorizando profundidades mayores.
+        stack: List[SearchNode] = [SearchNode(state=initial_state)]
+        visited: Set[GameState] = {initial_state}
+
+        expanded_nodes: int = 0
+        max_frontier_size: int = len(stack)
+
+        # Se procesa cada nodo hasta que la pila quede vacía.
+        while stack:
+            current_node: SearchNode = stack.pop()
+            expanded_nodes += 1
+
+            # Si se alcanzó el límite, no se generan sucesores para evitar desbordes.
+            if current_node.depth >= depth_limit:
+                continue
+
+            for move in self.game.get_valid_moves(current_node.state):
+                next_state: GameState = self.game.apply_move(current_node.state, move)
+
+                # Se descarta el sucesor si ya fue explorado en otra rama.
+                if not self._register_if_unvisited(next_state, visited):
+                    continue
+
+                next_node: SearchNode = SearchNode(
+                    state=next_state,
+                    parent=current_node,
+                    move=move,
+                    depth=current_node.depth + 1,
+                )
+
+                # Se verifica si el nuevo estado satisface la condición objetivo.
+                if self.game.is_goal_state(next_state):
+                    path: Sequence[Move] = next_node.reconstruct_path()
+                    execution_time: float = time.perf_counter() - start_time
+                    return SearchResult(
+                        path=path,
+                        expanded_nodes=expanded_nodes,
+                        max_frontier_size=max_frontier_size,
+                        solution_depth=next_node.depth,
+                        execution_time=execution_time,
+                    )
+
+                # El sucesor se apila para continuar la exploración en profundidad.
+                stack.append(next_node)
+                max_frontier_size = max(max_frontier_size, len(stack))
+
+        execution_time = time.perf_counter() - start_time
+        return SearchResult(
+            path=tuple(),
+            expanded_nodes=expanded_nodes,
+            max_frontier_size=max_frontier_size,
+            solution_depth=-1,
+            execution_time=execution_time,
+        )
 
     def a_star(self, initial_state: GameState, heuristic: CostHeuristic) -> SearchResult:
         """Ejecuta búsqueda A* utilizando la heurística proporcionada."""

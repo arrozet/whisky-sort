@@ -39,8 +39,8 @@ if __name__ == "__main__":
     # 2. Configura los parámetros del juego que quieres probar
     # Por ejemplo: 5 tubos en total, 3 colores diferentes.
     # La capacidad de los tubos está fija en 4 dentro de la clase.
-    NUM_TUBOS = 5
-    NUM_COLORES = 3
+    NUM_TUBOS = 8
+    NUM_COLORES = 6
 
     print(f"Creando un juego con {NUM_TUBOS} tubos y {NUM_COLORES} colores.")
 

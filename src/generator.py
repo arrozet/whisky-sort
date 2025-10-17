@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import random
 from typing import Optional
 
-from .water_sort_game import GameState, Move, TubeState, WaterSortGame
+from .water_sort_game import GameState, TubeState, WaterSortGame
 
 
 class PuzzleGenerator:
@@ -28,71 +29,80 @@ class PuzzleGenerator:
         Returns:
             Estado inicial resoluble como tupla inmutable de tuplas (tope en índice 0).
         """
-        # Importación local para evitar ciclos de importación innecesarios
-        import random
-
         rng = random.Random(seed)
+        extra_tubes: int = self.game.num_tubes - self.game.num_colors
+        if extra_tubes < 0:
+            raise ValueError("El número de tubos no puede ser menor que la cantidad de colores")
 
-        # Construir estado objetivo: cada color ocupa un tubo completo y el resto vacíos
-        # Nota: representación de tubos con el tope en el índice 0
-        colors = [f"C{i}" for i in range(self.game.num_colors)]
+        required_empty: int = extra_tubes
+        max_attempts: int = 512
 
-        solved_tubes: list[TubeState] = []
-        for color in colors:
-            solved_tubes.append(tuple([color] * self.game.tube_capacity))
+        attempt: int = 0
+        while attempt < max_attempts:
+            attempt += 1
+            state: GameState = self._build_random_state(rng, required_empty)
 
-        # Tubos vacíos restantes
-        empty_tubes = self.game.num_tubes - len(solved_tubes)
-        if empty_tubes < 0:
-            raise ValueError("El número de tubos es menor que el número de colores")
-
-        for _ in range(empty_tubes):
-            solved_tubes.append(tuple())
-
-        state: GameState = tuple(solved_tubes)
-
-        # Número de pasos de desorden: proporcional al tamaño del problema
-        # Comentario: usar un mínimo razonable para evitar estados triviales
-        min_steps = 12
-        max_steps = max(min_steps, self.game.num_colors * 10)
-        scramble_steps = rng.randint(max_steps // 2, max_steps)
-
-        # Desordenar aplicando movimientos válidos aleatorios, evitando revertir inmediatamente
-        last_move: Optional[Move] = None
-        step = 0
-        while step < scramble_steps:
-            moves = list(self.game.get_valid_moves(state))
-            if not moves:
-                # Si no hay movimientos, reiniciar desde objetivo para garantizar progreso
-                state = tuple(solved_tubes)
-                last_move = None
-                step = 0
+            if self.game.is_goal_state(state):
                 continue
 
-            # Filtrar el movimiento inverso inmediato para diversificar
-            if last_move is not None:
-                # Se crea el movimiento inverso (ej. (2,5) -> (5,2))
-                inv = (last_move[1], last_move[0])
-                # Se crea una lista de movimientos válidos que no sean el inverso
-                filtered = [m for m in moves if (m.source, m.target) != inv]
-                # Si hay movimientos válidos que no sean el inverso, se actualiza la lista de movimientos
-                # Si el único movimiento posible era el inverso, no se filtra nada
-                if filtered:
-                    moves = filtered
+            if self._count_empty_tubes(state) != required_empty:
+                continue
 
-            # Se elige un movimiento al azar
-            move = rng.choice(moves)
-            # Se aplica el movimiento al estado
-            state = self.game.apply_move(state, move)
-            # Se actualiza el último movimiento
-            last_move = (move.source, move.target)
-            step += 1
+            if not self._has_mixed_tube(state):
+                continue
 
-        # Evitar retornar por accidente un estado objetivo
-        if self.game.is_goal_state(state):
-            # Forzar un último movimiento válido para salir del objetivo
-            moves = list(self.game.get_valid_moves(state))
-            if moves:
-                state = self.game.apply_move(state, moves[0])
+            if not self.game.is_valid_state(state):
+                continue
 
-        return state
+            if self._is_state_solvable(state):
+                return state
+
+        raise RuntimeError("No se pudo generar un estado resoluble tras múltiples intentos")
+
+    def _build_random_state(self, rng: random.Random, empty_tubes: int) -> GameState:
+        """Construye un estado aleatorio distribuyendo equitativamente los colores."""
+        palette: list[str] = []
+
+        for color in self._iterate_color_labels():
+            palette.extend([color] * self.game.tube_capacity)
+
+        rng.shuffle(palette)
+
+        filled_tubes = self.game.num_tubes - empty_tubes
+        tubes: list[TubeState] = []
+
+        index: int = 0
+        for _ in range(filled_tubes):
+            slice_end = index + self.game.tube_capacity
+            segment = tuple(palette[index:slice_end])
+            tubes.append(segment)
+            index = slice_end
+
+        for _ in range(empty_tubes):
+            tubes.append(tuple())
+
+        rng.shuffle(tubes)
+        return tuple(tubes)
+
+    def _iterate_color_labels(self) -> list[str]:
+        """Genera las etiquetas utilizadas para representar cada color."""
+        return [f"C{index}" for index in range(self.game.num_colors)]
+
+    def _count_empty_tubes(self, state: GameState) -> int:
+        """Cuenta cuántos tubos están completamente vacíos en el estado."""
+        return sum(1 for tube in state if not tube)
+
+    def _has_mixed_tube(self, state: GameState) -> bool:
+        """Indica si existe al menos un tubo con más de un color distinto."""
+        for tube in state:
+            if len(tube) > 1 and len(set(tube)) > 1:
+                return True
+        return False
+
+    def _is_state_solvable(self, state: GameState) -> bool:
+        """Valida mediante una búsqueda BFS que el estado sea resoluble."""
+        from .search_solver import SearchResult, SearchSolver
+
+        solver = SearchSolver(self.game)
+        result: SearchResult = solver.bfs(state)
+        return result.solution_depth >= 0
